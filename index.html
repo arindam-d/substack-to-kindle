@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Reading Queue — Substack to Kindle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2EFE6;
+    --paper-raised:#FAF8F2;
+    --ink:#232722;
+    --ink-soft:#5B6259;
+    --rule:#D8D3C4;
+    --accent:#2F6F5E;
+    --accent-ink:#F2EFE6;
+    --danger:#8C4A3B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:2.5rem 1.25rem 6rem;}
+  header{margin-bottom:2.5rem;}
+  header h1{
+    font-family:'Newsreader',serif; font-weight:600; font-style:normal;
+    font-size:2.1rem; line-height:1.15; margin:0 0 .4rem;
+    letter-spacing:-0.01em;
+  }
+  header p{margin:0; color:var(--ink-soft); font-size:.95rem; max-width:46ch;}
+  .config-bar{
+    display:flex; gap:.5rem; margin-top:1.25rem; flex-wrap:wrap;
+  }
+  .config-bar input{
+    flex:1; min-width:220px; padding:.55rem .7rem; border:1px solid var(--rule);
+    border-radius:6px; background:var(--paper-raised); font-size:.85rem; color:var(--ink);
+    font-family:'Inter',sans-serif;
+  }
+  .config-bar button{
+    padding:.55rem 1rem; border-radius:6px; border:1px solid var(--rule);
+    background:var(--paper-raised); font-size:.85rem; cursor:pointer; color:var(--ink);
+  }
+  .status{font-size:.85rem; color:var(--ink-soft); margin-top:.6rem; min-height:1.2em;}
+
+  .week{margin-bottom:2.5rem;}
+  .week-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:1px solid var(--rule); padding-bottom:.5rem; margin-bottom:1rem;
+  }
+  .week-head h2{
+    font-family:'Newsreader',serif; font-weight:500; font-size:1.15rem; margin:0;
+  }
+  .week-head button{
+    background:none; border:none; color:var(--accent); font-size:.8rem;
+    cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;
+  }
+
+  .item{
+    display:flex; gap:.85rem; padding:1rem 0; border-bottom:1px solid var(--rule);
+  }
+  .item:last-child{border-bottom:none;}
+  .item input[type=checkbox]{
+    margin-top:.3rem; width:18px; height:18px; accent-color:var(--accent); flex-shrink:0;
+  }
+  .item-body{flex:1; min-width:0;}
+  .item-title{
+    font-family:'Newsreader',serif; font-size:1.05rem; line-height:1.35; margin:0 0 .25rem;
+    font-weight:500;
+  }
+  .item-meta{
+    font-size:.78rem; color:var(--ink-soft); margin-bottom:.4rem;
+    display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;
+  }
+  .tag{
+    font-size:.7rem; padding:.1rem .45rem; border-radius:4px;
+    background:var(--paper-raised); border:1px solid var(--rule); color:var(--ink-soft);
+  }
+  .item-preview{
+    font-size:.88rem; color:var(--ink-soft); line-height:1.5; margin:0;
+  }
+  .item a.readlink{color:var(--accent); font-size:.78rem; text-decoration:none;}
+  .item a.readlink:hover{text-decoration:underline;}
+
+  .empty{
+    text-align:center; padding:4rem 1rem; color:var(--ink-soft);
+  }
+  .empty h2{font-family:'Newsreader',serif; color:var(--ink); font-weight:500;}
+
+  .actionbar{
+    position:fixed; left:0; right:0; bottom:0;
+    background:var(--paper-raised); border-top:1px solid var(--rule);
+    padding:.85rem 1.25rem; display:flex; gap:.75rem; align-items:center;
+    justify-content:center; flex-wrap:wrap;
+  }
+  .actionbar .count{font-size:.85rem; color:var(--ink-soft); margin-right:auto;}
+  .actionbar button{
+    padding:.65rem 1.15rem; border-radius:7px; border:none; font-size:.9rem;
+    font-weight:500; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .btn-send{background:var(--accent); color:var(--accent-ink);}
+  .btn-send:disabled{background:#B7C9C1; cursor:not-allowed;}
+  .btn-discard{background:transparent; color:var(--danger); border:1px solid var(--danger);}
+  .btn-discard:disabled{opacity:.4; cursor:not-allowed;}
+
+  @media (prefers-reduced-motion:no-preference){
+    .item{transition:opacity .2s ease;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Reading queue</h1>
+    <p>Newsletters collected since your last review. Pick what's worth reading this week — the rest stays queued.</p>
+    <div class="config-bar" id="configBar" style="display:none;">
+      <input id="apiUrlInput" placeholder="Apps Script Web App URL (ends in /exec)"/>
+      <input id="tokenInput" placeholder="Access token"/>
+      <button id="saveConfigBtn">Save</button>
+    </div>
+    <div class="status" id="status"></div>
+  </header>
+
+  <div id="content"></div>
+</div>
+
+<div class="actionbar" id="actionbar" style="display:none;">
+  <span class="count" id="selCount">0 selected</span>
+  <button class="btn-discard" id="discardBtn" disabled>Discard</button>
+  <button class="btn-send" id="sendBtn" disabled>Send to Kindle</button>
+</div>
+
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var apiUrl = localStorage.getItem('stk_api_url') || qs.get('api') || '';
+  var token  = qs.get('token') || localStorage.getItem('stk_token') || '';
+  if (qs.get('token')) localStorage.setItem('stk_token', token);
+  if (qs.get('api'))   { apiUrl = qs.get('api'); localStorage.setItem('stk_api_url', apiUrl); }
+
+  var els = {
+    configBar: document.getElementById('configBar'),
+    apiUrlInput: document.getElementById('apiUrlInput'),
+    tokenInput: document.getElementById('tokenInput'),
+    saveConfigBtn: document.getElementById('saveConfigBtn'),
+    status: document.getElementById('status'),
+    content: document.getElementById('content'),
+    actionbar: document.getElementById('actionbar'),
+    selCount: document.getElementById('selCount'),
+    sendBtn: document.getElementById('sendBtn'),
+    discardBtn: document.getElementById('discardBtn'),
+  };
+
+  var pending = [];
+  var selected = new Set();
+
+  function needsConfig(){ return !apiUrl || !token; }
+
+  function showConfigBar(){
+    els.configBar.style.display = 'flex';
+    els.apiUrlInput.value = apiUrl;
+    els.tokenInput.value = token;
+  }
+  els.saveConfigBtn.addEventListener('click', function(){
+    apiUrl = els.apiUrlInput.value.trim();
+    token  = els.tokenInput.value.trim();
+    localStorage.setItem('stk_api_url', apiUrl);
+    localStorage.setItem('stk_token', token);
+    load();
+  });
+
+  function api(action, keys){
+    var url = apiUrl + '?action=' + encodeURIComponent(action) +
+              '&token=' + encodeURIComponent(token) +
+              (keys ? '&keys=' + encodeURIComponent(keys.join(',')) : '');
+    return fetch(url).then(function(r){ return r.json(); });
+  }
+
+  function wordsToReadTime(words){
+    var mins = Math.max(1, Math.round(words / 200));
+    return mins + ' min read';
+  }
+
+  function render(){
+    els.content.innerHTML = '';
+    if (!pending.length){
+      els.content.innerHTML =
+        '<div class="empty"><h2>Nothing waiting</h2>' +
+        '<p>Your queue is empty. New newsletters will appear here as they arrive.</p></div>';
+      els.actionbar.style.display = 'none';
+      return;
+    }
+    els.actionbar.style.display = 'flex';
+
+    var groups = {};
+    var order = [];
+    pending.forEach(function(item){
+      if (!groups[item.weekLabel]){ groups[item.weekLabel] = []; order.push(item.weekLabel); }
+      groups[item.weekLabel].push(item);
+    });
+
+    order.forEach(function(label){
+      var section = document.createElement('section');
+      section.className = 'week';
+
+      var head = document.createElement('div');
+      head.className = 'week-head';
+      var h2 = document.createElement('h2');
+      h2.textContent = label;
+      var selAllBtn = document.createElement('button');
+      selAllBtn.textContent = 'Select all';
+      selAllBtn.addEventListener('click', function(){
+        groups[label].forEach(function(it){ selected.add(it.key); });
+        render();
+      });
+      head.appendChild(h2);
+      head.appendChild(selAllBtn);
+      section.appendChild(head);
+
+      groups[label].forEach(function(item){
+        var row = document.createElement('div');
+        row.className = 'item';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = selected.has(item.key);
+        cb.addEventListener('change', function(){
+          if (cb.checked) selected.add(item.key); else selected.delete(item.key);
+          updateActionbar();
+        });
+
+        var body = document.createElement('div');
+        body.className = 'item-body';
+
+        var title = document.createElement('p');
+        title.className = 'item-title';
+        title.textContent = item.title;
+
+        var meta = document.createElement('div');
+        meta.className = 'item-meta';
+        var tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = item.source === 'rss' ? 'RSS' : 'Email';
+        meta.appendChild(tag);
+        var metaText = document.createElement('span');
+        metaText.textContent = item.author + ' · ' + wordsToReadTime(item.words);
+        meta.appendChild(metaText);
+
+        var preview = document.createElement('p');
+        preview.className = 'item-preview';
+        preview.textContent = item.preview;
+
+        body.appendChild(title);
+        body.appendChild(meta);
+        body.appendChild(preview);
+
+        if (item.url){
+          var link = document.createElement('a');
+          link.className = 'readlink';
+          link.href = item.url;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = 'Open original →';
+          body.appendChild(link);
+        }
+
+        row.appendChild(cb);
+        row.appendChild(body);
+        section.appendChild(row);
+      });
+
+      els.content.appendChild(section);
+    });
+
+    updateActionbar();
+  }
+
+  function updateActionbar(){
+    var n = selected.size;
+    els.selCount.textContent = n + (n === 1 ? ' selected' : ' selected');
+    els.sendBtn.disabled = n === 0;
+    els.discardBtn.disabled = n === 0;
+  }
+
+  els.sendBtn.addEventListener('click', function(){
+    if (!selected.size) return;
+    var keys = Array.from(selected);
+    els.sendBtn.disabled = true;
+    els.status.textContent = 'Sending ' + keys.length + ' article(s) to your Kindle…';
+    api('deliver', keys).then(function(res){
+      els.status.textContent = res.message || (res.error ? ('Error: ' + res.error) : 'Done.');
+      selected.clear();
+      load();
+    }).catch(function(err){
+      els.status.textContent = 'Network error: ' + err;
+      els.sendBtn.disabled = false;
+    });
+  });
+
+  els.discardBtn.addEventListener('click', function(){
+    if (!selected.size) return;
+    var keys = Array.from(selected);
+    els.discardBtn.disabled = true;
+    els.status.textContent = 'Discarding ' + keys.length + ' article(s)…';
+    api('discard', keys).then(function(res){
+      els.status.textContent = res.discarded ? ('Discarded ' + res.discarded + '.') :
+                                (res.error ? ('Error: ' + res.error) : 'Done.');
+      selected.clear();
+      load();
+    }).catch(function(err){
+      els.status.textContent = 'Network error: ' + err;
+      els.discardBtn.disabled = false;
+    });
+  });
+
+  function load(){
+    if (needsConfig()){ showConfigBar(); els.status.textContent = 'Enter your Web App URL and token above, then Save.'; return; }
+    els.configBar.style.display = 'none';
+    els.status.textContent = 'Loading…';
+    api('pending').then(function(res){
+      if (res.error){ els.status.textContent = 'Error: ' + res.error; showConfigBar(); return; }
+      pending = res.pending || [];
+      selected.clear();
+      els.status.textContent = pending.length ?
+        (pending.length + ' article(s) waiting for review.') : '';
+      render();
+    }).catch(function(err){
+      els.status.textContent = 'Could not reach the backend: ' + err;
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
