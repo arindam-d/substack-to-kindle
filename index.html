@@ -135,9 +135,19 @@
 
 <script>
 (function(){
+  // ── FILL THESE IN BEFORE DEPLOYING, then the page opens with no setup ──
+  // This is a personal single-user tool: the token only gates "send my own
+  // newsletters to my own Kindle," so baking it into this file (rather than
+  // a bookmark's query string) is a reasonable trade for zero friction.
+  // Same visibility either way — the token is readable via view-source and
+  // was already readable in your bookmarked URL before this change.
+  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwSTe6A-B7LbP-xIo1jA7a4oWszMMCEdBjsDgkbJ9kCUjWpahQ-jE-HCXuslvj73QrcpA/exec';
+  var DEFAULT_TOKEN   = '28e0d235-8de8-4963-adee-c256c492f8c746b7066a-d3ad-4aad-b83b-1e73092f782c';
+  // ─────────────────────────────────────────────────────────────────────
+
   var qs = new URLSearchParams(location.search);
-  var apiUrl = localStorage.getItem('stk_api_url') || qs.get('api') || '';
-  var token  = qs.get('token') || localStorage.getItem('stk_token') || '';
+  var apiUrl = qs.get('api') || localStorage.getItem('stk_api_url') || DEFAULT_API_URL;
+  var token  = qs.get('token') || localStorage.getItem('stk_token') || DEFAULT_TOKEN;
   if (qs.get('token')) localStorage.setItem('stk_token', token);
   if (qs.get('api'))   { apiUrl = qs.get('api'); localStorage.setItem('stk_api_url', apiUrl); }
 
